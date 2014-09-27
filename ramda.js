@@ -2372,7 +2372,7 @@
      *
      * @private
      * @category Internal
-     * @param {Array} The array to search
+     * @param {Array} list The array to search
      * @param {*} item the item to find in the Array
      * @param {Number} from (optional) the index to start searching the Array
      * @return {Number} the index of the found item, or -1
@@ -2473,8 +2473,8 @@
      * @category List
      * @sig a -> Number -> [a] -> Number
      * @param {*} target The item to find.
-     * @param {Array} list The array to search in.
      * @param {Number} fromIdx the index to start searching from
+     * @param {Array} list The array to search in.
      * @return {Number} the index of the target, or -1 if the target is not found.
      *
      * @example
