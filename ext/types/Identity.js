@@ -63,7 +63,6 @@
         return app.map(this.value);
     };
 
-
     /**
      * Chain specification. Transforms the value of the `Identity[a]`
      * type using an unary function to monads. The `Identity[a]` type
@@ -76,7 +75,6 @@
     Identity.prototype.chain = function(fn) {
         return fn(this.value);
     };
-
 
     // equality method to enable testing
     Identity.prototype.equals = function(that) {
