@@ -76,6 +76,16 @@
         return fn(this.value);
     };
 
+    /**
+     * Returns the value of `Identity[a]`
+     *
+     * @returns a
+     * @sig (Identity[a]) => a
+     */
+    Identity.prototype.get = function() {
+        return this.value;
+    };
+
     // equality method to enable testing
     Identity.prototype.equals = function(that) {
         return this.value === that.value;
