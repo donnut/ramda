@@ -1,24 +1,3 @@
-// Copyright (c) 2013-2014 Quildreen Motta <quildreen@gmail.com>
-//
-// Permission is hereby granted, free of charge, to any person
-// obtaining a copy of this software and associated documentation files
-// (the "Software"), to deal in the Software without restriction,
-// including without limitation the rights to use, copy, modify, merge,
-// publish, distribute, sublicense, and/or sell copies of the Software,
-// and to permit persons to whom the Software is furnished to do so,
-// subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be
-// included in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
-// LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-// WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
 (function(root, factory) {
     if (typeof define === 'function' && define.amd) {
         // AMD. Register as an anonymous module.
@@ -80,7 +59,9 @@
      *
      * @class
      */
-    function Maybe() {}
+    function Maybe(a) {
+        return (a != null) ? new Just(a) : new Nothing();
+    }
 
     // The case for successful values
     Just.prototype = clone(Maybe.prototype);
@@ -122,20 +103,6 @@
 
 
     // -- Conversions ------------------------------------------------------
-
-    /**
-     * Constructs a new `Maybe[α]` structure from a nullable type.
-     *
-     * If the value is either `null` or `undefined`, this function returns a
-     * `Nothing`, otherwise the value is wrapped in a `Just(α)`.
-     *
-     * @summary α → Maybe[α]
-     */
-    Maybe.fromNullable = function(a) {
-      return a != null?       new Just(a)
-      :      /* otherwise */  new Nothing();
-    }
-    Maybe.prototype.fromNullable = Maybe.fromNullable;
 
     /**
      * Constructs a new `Maybe[β]` structure from an `Either[α, β]` type.
@@ -290,8 +257,7 @@
     };
 
     Just.prototype.equals = function(b) {
-      return b.isJust
-      &&     b.value === this.value;
+      return b.isJust && b.value === this.value;
     };
 
 

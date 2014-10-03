@@ -20,8 +20,8 @@ describe('Maybe', function() {
 
     it('is an Apply', function() {
         var aTest = types.apply;
-        var appA = Maybe.fromNullable(R.multiply(10));
-        var appU = Maybe.fromNullable(R.add(7));
+        var appA = Maybe(R.multiply(10));
+        var appU = Maybe(R.add(7));
         var appV = Maybe.Just(10);
 
         assert.equal(true, aTest.iface(appA));
@@ -33,7 +33,7 @@ describe('Maybe', function() {
         var aTest = types.applicative;
         var app1 = Maybe.Just(101);
         var app2 = Maybe.Just(-123);
-        var appF = Maybe.fromNullable(R.multiply(3));
+        var appF = Maybe(R.multiply(3));
 
         assert.equal(true, aTest.iface(app1));
         assert.equal(true, aTest.id(app1, app2));
@@ -42,7 +42,7 @@ describe('Maybe', function() {
         assert.equal(true, aTest.interchange(app2, appF, 17));
 
         assert.equal(true, aTest.iface(maybeNull));
-        assert.equal(true, aTest.id(maybeNull, Maybe.fromNullable(null)));
+        assert.equal(true, aTest.id(maybeNull, Maybe(null)));
         assert.equal(true, aTest.homomorphic(maybeNull, R.add(3), 46));
         assert.equal(true, aTest.interchange(maybeNull, appF, 17));
 
@@ -50,9 +50,9 @@ describe('Maybe', function() {
 
     it('is a Chain', function() {
         var cTest = types.chain;
-        var f1 = function(x) {return Maybe.fromNullable(3 * x);};
-        var f2 = function(x) {return Maybe.fromNullable(5 + x);};
-        var fNull = function() {return Maybe.fromNullable(null);};
+        var f1 = function(x) {return Maybe(3 * x);};
+        var f2 = function(x) {return Maybe(5 + x);};
+        var fNull = function() {return Maybe(null);};
         assert.equal(true, cTest.iface(m));
         assert.equal(true, cTest.associative(m, f1, f2));
         assert.equal(true, cTest.iface(maybeNull));
