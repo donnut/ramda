@@ -1,5 +1,6 @@
 var assert = require('assert');
 var R = require('..');
+var Maybe = require('../ext/types/Maybe');
 
 describe('flip', function() {
     it('should return a function which inverts the first two arguments to the supplied function', function() {
@@ -230,5 +231,44 @@ describe('ap', function() {
         var val = R.ap([mult2, plus3]);
         assert.equal(typeof val, 'function');
         assert.deepEqual(val([1, 2, 3]), [2, 4, 6, 4, 5, 6]);
+    });
+});
+
+describe('lift2M', function() {
+    var ma = Maybe(4);
+    var mb = Maybe(5);
+    function transformation(x, y) { return x + y; }
+
+    it('apply transformation to monad values', function() {
+        var val = R.lift2M(ma, mb, transformation);
+        assert.ok(val.isJust);
+        assert.equal(val.get(), 9);
+    });
+
+    it('is curried', function() {
+        var val = R.lift2M(ma, mb);
+        assert.equal(typeof val, 'function');
+        assert.equal(val(transformation).get(), 9);
+    });
+});
+
+describe('lift3M', function() {
+    var ma = Maybe(4);
+    var mb = Maybe(5);
+    var mc = Maybe(6);
+    function transformation(x, y, z) { return x + y + z; }
+
+    it('apply transformation to monad values', function() {
+        var val = R.lift3M(ma, mb, mc, transformation);
+        assert.ok(val.isJust);
+        assert.equal(val.get(), 15);
+    });
+
+    it('is curried', function() {
+        var val = R.lift3M(ma, mb);
+        assert.equal(typeof val, 'function');
+        val = val(mc);
+        assert.equal(typeof val, 'function');
+        assert.equal(val(transformation).get(), 15);
     });
 });

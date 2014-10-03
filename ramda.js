@@ -1973,6 +1973,41 @@
         return unnest(map(f, list));
     }));
 
+    /**
+     * lift2M lifts the values of two monads and applies the function on
+     * these results returning a new monad.
+     *
+     * @func
+     * @memberOf R
+     * @category Function
+     * @sig Monad m => m a -> m b -> (a -> b -> r) -> m r
+     */
+    R.lift2M = curry3(function(ma, mb, fn) {
+        return ma.chain(function(valueA) {
+            return mb.map(function(valueB) {
+                return fn(valueA, valueB);
+            });
+        });
+    });
+
+    /**
+     * lift3M lifts the values of three monads and applies the function on
+     * these results returning a new monad.
+     *
+     * @func
+     * @memberOf R
+     * @category Function
+     * @sig Monad m => m a -> m b -> m c -> (a -> b -> c -> r) -> m r
+     */
+    R.lift3M = curryN(4, function(ma, mb, mc, fn) {
+        return ma.chain(function(valueA) {
+            return mb.chain(function(valueB) {
+                return mc.map(function(valueC) {
+                    return fn(valueA, valueB, valueC);
+                });
+            });
+        });
+    });
 
     /**
      * Returns the number of elements in the array by returning `list.length`.
