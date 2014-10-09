@@ -143,6 +143,7 @@
      * @memberOf R
      * @category Type
      * @category List
+     * @sig * -> Boolean
      * @param {*} x The object to test.
      * @return {boolean} `true` if `x` has a numeric length property; `false` otherwise.
      * @example
