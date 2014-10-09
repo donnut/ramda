@@ -1886,6 +1886,66 @@
 
 
     /**
+     * "lifts" a function to be the specified arity, so that it may "map over" that many
+     * lists (or other Functors).
+     *
+     * @func
+     * @memberOf R
+     * @see R.lift
+     * @category Function
+     * @sig Number -> (*... -> *) -> ([*]... -> [*])
+     * @param {Function} fn The function to lift into higher context
+     * @return {Function} The function `fn` applicable to mappable objects.
+     * @example
+     *
+     *     var madd3 = R.liftN(3, R.curryN(3, function() {
+     *         return R.foldl(R.add, 0, arguments);
+     *     }));
+     *     madd3([1,2,3], [1,2,3], [1]); //=> [3, 4, 5, 4, 5, 6, 5, 6, 7]
+     */
+    R.liftN = curry2(function liftN(arity, fn) {
+        var lifted = curryN(arity, fn);
+        if (arguments.length === 0) {
+            throw noArgsException();
+        }
+        return R.curryN(arity, function() {
+            return R.foldl(R.ap, R.map(lifted, arguments[0]), _slice(arguments, 1));
+        });
+    });
+
+
+    /**
+     * "lifts" a function of arity > 1 so that it may "map over" an Array or
+     * other Functor.
+     *
+     * @func
+     * @memberOf R
+     * @see R.liftN
+     * @category Function
+     * @sig (*... -> *) -> ([*]... -> [*])
+     * @param {Function} fn The function to lift into higher context
+     * @return {Function} The function `fn` applicable to mappable objects.
+     * @example
+     *
+     *     var madd3 = R.lift(R.curryN(3, function(a, b, c) {
+     *         return a + b + c;
+     *     }));
+     *     madd3([1,2,3], [1,2,3], [1]); //=> [3, 4, 5, 4, 5, 6, 5, 6, 7]
+     *
+     *     var madd5 = R.lift(R.curryN(5, function(a, b, c, d, e) {
+     *         return a + b + c + d + e;
+     *     }));
+     *     madd5([1,2], [3], [4, 5], [6], [7, 8]); //=> [21, 22, 22, 23, 22, 23, 23, 24]
+     */
+    R.lift = function lift(fn) {
+        if (arguments.length === 0) {
+            throw noArgsException();
+        }
+        return R.liftN(fn.length, fn);
+    };
+
+
+    /**
      * ap applies a list of functions to a list of values.
      *
      * @func
@@ -3404,6 +3464,60 @@
         return hasOwnProperty.call(obj, p) ? obj[p] : val;
     });
 
+    /**
+     * Returns whether or not an object has an own property with
+     * the specified name
+     *
+     * @func
+     * @memberOf R
+     * @category Object
+     * @sig s -> {s: x} -> Boolean
+     * @param {String} prop The name of the property to check for.
+     * @param {Object} obj The object to query.
+     * @return {Boolean} Whether the property exists.
+     * @example
+     *
+     *      var obj = {
+     *        foo: 1,
+     *        bar: 2,
+     *      };
+     *      R.has('foo', obj);  //=> true
+     *
+     *      var list = [{foo: 1}, {foo: 2}, {bar: 3}];
+     *      R.filter(R.has('foo'), list);  //=> [{foo: 1}, {foo: 2}]
+     */
+    R.has = curry2(function(prop, obj) {
+        return hasOwnProperty.call(obj, prop);
+    });
+
+    /**
+     * Returns whether or not an object or its prototype chain has
+     * a property with the specified name
+     *
+     * @func
+     * @memberOf R
+     * @category Object
+     * @sig s -> {s: x} -> Boolean
+     * @param {String} prop The name of the property to check for.
+     * @param {Object} obj The object to query.
+     * @return {Boolean} Whether the property exists.
+     * @example
+     *
+     *      function Rectangle(width, height) {
+     *          this.width = width;
+     *          this.height = height;
+     *      }
+     *      Rectangle.prototype.area = function() {
+     *          return this.width * this.height;
+     *      };
+     *
+     *      var square = new Rectangle(2, 2);
+     *      R.hasIn('width', square);  //=> true
+     *      R.hasIn('area', square);  //=> true
+     */
+    R.hasIn = curry2(function(prop, obj) {
+        return prop in obj;
+    });
 
     /**
      * Calls the specified function on the supplied object. Any additional arguments
@@ -4976,6 +5090,33 @@
     R.path = R.pathOn('.');
 
 
+    /**
+     * Determines whether a nested path on an object, seperated by periods,
+     * has a specific value according to strict equality ('==='). Most
+     * likely used to filter a list:
+     *
+     * @func
+     * @memberOf R
+     * @category relation
+     * @sig String -> v -> {k: v} -> Boolean
+     * @param {string} path The path of the nested property to use
+     * @param {*} val The value to compare the nested property with
+     * @param {k: v} obj obj The object to check the nested property in
+     * @return {boolean} `true` if the value equals the nested object property,
+     *     `false` otherwise.
+     * @example
+     *
+     *     var user1 = { address: { zipCode: 90210 } };
+     *     var user2 = { address: { zipCode: 55555 } };
+     *     var user3 = { name: 'Bob' };
+     *     var users = [ user1, user2, user3 ]
+     *     var isFamous = R.pathEq('address.zipCode', 90210);
+     *     R.filter(isFamous, users); //=> [ user1 ]
+     */
+    R.pathEq = curry3(function(path, val, obj) {
+        return R.eq(val, R.path(path, obj));
+    });
+
 
     // Data Analysis and Grouping Functions
     // ------------------------------------
@@ -5235,6 +5376,20 @@
         return map(function(item) {return {key: fn(item), val: item};}, list);
     }
 
+    /**
+     * Compare two items from a list generated from the `keyValue`
+     * function. Used internally by sortBy.
+     *
+     * @private
+     * @func
+     * @category relation
+     * @param {*} a
+     * @param {*} b
+     */
+    var compareKeys = comparator(function(a, b) {
+        return a.key < b.key;
+    });
+
 
     /**
      * Sorts the list according to a key generated by the supplied function.
@@ -5268,7 +5423,7 @@
      *      sortByNameCaseInsensitive(people); //=> [alice, bob, clara]
      */
     R.sortBy = curry2(function sortBy(fn, list) {
-        return pluck('val', keyValue(fn, list).sort(comparator(function(a, b) {return a.key < b.key;})));
+        return pluck('val', keyValue(fn, list).sort(compareKeys));
     });
 
 

@@ -52,13 +52,16 @@ describe('Identity', function() {
         var mTest = types.monad;
         assert.equal(true, mTest.iface(m));
     });
+});
+
+describe('Identity example', function() {
 
     it('returns wrapped value', function() {
         var identNumber = Identity(4);
         assert.equal(identNumber.get(), 4);
 
-        var identArray = Identity([1,2,3,4]);
-        assert.deepEqual(identArray.get(), [1,2,3,4]);
+        var identArray = Identity([1, 2, 3, 4]);
+        assert.deepEqual(identArray.get(), [1, 2, 3, 4]);
     });
 
 });
