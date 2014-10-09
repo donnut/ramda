@@ -35,11 +35,22 @@
      * @namespace R
      */
     // jscs:disable disallowQuotedKeysInObjects
-    var R = {'version': '0.5.0'};
+    var R = {'version': '0.6.0'};
     // jscs:enable disallowQuotedKeysInObjects
 
     // Internal Functions and Properties
     // ---------------------------------
+
+    /**
+     * Creates an exception about calling a function with no arguments.
+     *
+     * @private
+     * @category Internal
+     * @return {TypeError} A no arguments exception.
+     */
+    function noArgsException() {
+        return new TypeError('Function called with no arguments');
+    }
 
     /**
      * An optimized, private array `slice` implementation.
@@ -61,7 +72,7 @@
      */
     function _slice(args, from, to) {
         switch (arguments.length) {
-            case 0: throw NO_ARGS_EXCEPTION;
+            case 0: throw noArgsException();
             case 1: return _slice(args, 0, args.length);
             case 2: return _slice(args, from, args.length);
             default:
@@ -129,10 +140,11 @@
      * Tests whether or not an object is similar to an array.
      *
      * @func
+     * @memberOf R
      * @category Type
      * @category List
-     * @param {*} val The object to test.
-     * @return {boolean} `true` if `val` has a numeric length property; `false` otherwise.
+     * @param {*} x The object to test.
+     * @return {boolean} `true` if `x` has a numeric length property; `false` otherwise.
      * @example
      *
      *      R.isArrayLike([]); //=> true
@@ -151,9 +163,6 @@
             )
         );
     };
-
-
-    var NO_ARGS_EXCEPTION = new TypeError('Function called with no arguments');
 
 
     /**
@@ -175,7 +184,7 @@
         return function(a, b) {
             switch (arguments.length) {
                 case 0:
-                    throw NO_ARGS_EXCEPTION;
+                    throw noArgsException();
                 case 1:
                     return function(b) {
                         return fn(a, b);
@@ -206,7 +215,7 @@
         return function(a, b, c) {
             switch (arguments.length) {
                 case 0:
-                    throw NO_ARGS_EXCEPTION;
+                    throw noArgsException();
                 case 1:
                     return curry2(function(b, c) {
                         return fn(a, b, c);
@@ -221,22 +230,23 @@
         };
     }
 
-    if (typeof Object.defineProperty === 'function') {
-        try {
-            Object.defineProperty(R, '_', {writable: false, value: void 0});
-        } catch (e) {}
+    var __;  // This is intentionally left `undefined`.
+    try {
+        Object.defineProperty(R, '__', {writable: false, value: __});
+    } catch (e) {
+        R.__ = __;
     }
-    var _ = R._;  void _;// This intentionally left `undefined`.
 
     /**
-     * Converts a function into something like an infix operation, meaning that
-     * when called with a single argument, that argument is applied to the
-     * second position, sort of a curry-right.  This allows for more natural
-     * processing of functions which are really binary operators.
+     * Uses a placeholder to convert a binary function into something like an infix operation.
+     * When called with an `undefined` placeholder (e.g. `R.__`) the second argument is applied to the
+     * second position, and it returns a function waiting for its first argument.
+     * This can allow for more natural processing of functions which are really binary operators.
      *
+     * @func
      * @memberOf R
-     * @category Functions
-     * @param {function} fn The operation to adjust
+     * @category Function
+     * @param {function} fn The binary operation to adjust
      * @return {function} A new function that acts somewhat like an infix operator.
      * @example
      *
@@ -245,20 +255,28 @@
      *      });
      *
      *      div(6, 3); //=> 2
-     *      div(6, _)(3); //=> 2 // note: `_` here is just an `undefined` value.  You could use `void 0` instead
-     *      div(3)(6); //=> 2
+     *      div(6)(3); //=> 2
+     *      div(__, 3)(6); //=> 2 // note: `__` here is just an `undefined` value.  You could use `void 0` instead
+     *      div(__)(3, 6); //=> 2
+     *      div(__)(3)(6); //=> 2
      */
     var op = R.op = function op(fn) {
         var length = fn.length;
-        if (length < 2) {throw new Error('Expected binary function.');}
-        var left = curry(fn), right = curry(R.flip(fn));
+        if (length !== 2) {throw new Error('Expected binary function.');}
 
-        return function(a, b) {
+        return function _op(a, b) {
             switch (arguments.length) {
-                case 0: throw NO_ARGS_EXCEPTION;
-                case 1: return right(a);
-                case 2: return (b === R._) ? left(a) : left.apply(null, arguments);
-                default: return left.apply(null, arguments);
+                case 0: throw noArgsException();
+                case 1:
+                    if (a === __) {
+                        return R.flip(_op);
+                    }
+                    return R.lPartial(fn, a);
+                default:
+                    if (a === __) {
+                        return R.rPartial(fn, b);
+                    }
+                    return fn(a, b);
             }
         };
     };
@@ -277,6 +295,7 @@
      *
      * @func
      * @memberOf R
+     * @category core
      * @category Function
      * @sig Number -> (* -> a) -> (* -> a)
      * @param {number} fnArity The arity for the returned function.
@@ -297,7 +316,7 @@
     var curryN = R.curryN = function curryN(length, fn) {
         return (function recurry(args) {
             return arity(Math.max(length - (args && args.length || 0), 0), function() {
-                if (arguments.length === 0) { throw NO_ARGS_EXCEPTION; }
+                if (arguments.length === 0) { throw noArgsException(); }
                 var newArgs = concat(args, arguments);
                 if (newArgs.length >= length) {
                     return fn.apply(this, newArgs);
@@ -317,6 +336,7 @@
      *
      * @func
      * @memberOf R
+     * @category core
      * @category Function
      * @sig (* -> a) -> (* -> a)
      * @param {Function} fn The function to curry.
@@ -533,43 +553,61 @@
 
 
     /**
-     * Turns a named method of an object (or object prototype) into a function that can be
-     * called directly. Passing the optional `len` parameter restricts the returned function to
-     * the initial `len` parameters of the method.
+     * Turns a named method of an object (or object prototype) into a function
+     * that can be called directly.
      *
-     * The returned function is curried and accepts `len + 1` parameters (or `method.length + 1`
-     * when `len` is not specified), and the final parameter is the target object.
+     * The returned function is curried and accepts `len + 1` parameters and
+     * the final parameter is the target object.
      *
      * @func
      * @memberOf R
      * @category Function
-     * @sig (String, Object, Number) -> (* -> *)
-     * @param {string} name The name of the method to wrap.
-     * @param {Object} obj The object to search for the `name` method.
-     * @param [len] The desired arity of the wrapped method.
-     * @return {Function} A new function or `undefined` if the specified method is not found.
+     * @sig (Number, (a... -> b)) -> (a... -> c -> b)
+     * @param {number} len Number of arguments the returned function should take
+     *        before the target object.
+     * @param {Function} method The method to wrap.
+     * @return {Function} A new curried function.
+     * @see R.invoker
      * @example
      *
-     *      var charAt = R.invoker('charAt', String.prototype);
+     *      var sliceFrom = R.invokerN(1, String.prototype.slice);
+     *      sliceFrom(6, 'abcdefghijklm'); //=> 'ghijklm'
+     */
+    var invokerN = R.invokerN = function invokerN(len, method) {
+        return curryN(len + 1, function() {
+            var target = R.last(arguments);
+            return method.apply(target,
+                Array.prototype.slice.call(arguments, 0, -1));
+        });
+    };
+
+
+    /**
+     * Turns a named method of an object (or object prototype) into a function that can be
+     * called directly.
+     *
+     * The returned function is curried and accepts `method.length + 1` parameters
+     * and the final parameter is the target object.
+     *
+     * @func
+     * @memberOf R
+     * @category Function
+     * @sig (a... -> b) -> (a... -> c -> b)
+     * @param {Function} method The method to wrap.
+     * @return {Function} A new curried function.
+     * @see R.invokerN
+     * @example
+     *
+     *      var charAt = R.invoker(String.prototype.charAt);
      *      charAt(6, 'abcdefghijklm'); //=> 'g'
      *
-     *      var join = R.invoker('join', Array.prototype);
+     *      var join = R.invoker(Array.prototype.join);
      *      var firstChar = charAt(0);
      *      join('', R.map(firstChar, ['light', 'ampliifed', 'stimulated', 'emission', 'radiation']));
      *      //=> 'laser'
      */
-    var invoker = R.invoker = function _invoker(name, obj, len) {
-        var method = obj[name];
-        var length = len === void 0 ? method.length : len;
-        return method && curryN(length + 1, function() {
-            if (arguments.length) {
-                var target = Array.prototype.pop.call(arguments);
-                var targetMethod = target[name];
-                if (targetMethod == method) {
-                    return targetMethod.apply(target, arguments);
-                }
-            }
-        });
+    var invoker = R.invoker = function invoker(method) {
+        return invokerN(method.length, method);
     };
 
 
@@ -580,12 +618,18 @@
      * new function. For example:
      *
      * ```javascript
-     *   var useWithExample = R.useWith(someFn, transformerFn1, transformerFn2);
      *
-     *   // This invocation:
-     *   useWithExample('x', 'y');
-     *   // Is functionally equivalent to:
-     *   someFn(transformerFn1('x'), transformerFn2('y'))
+     *   var between = R.useWith(R.and,R.lt,R.gt)
+     *
+     *   //This invocation
+     *   var isTeen = between(12,20)
+     *
+     *   //Is functionally equivalent to:
+     *   var isTeen = R.and(R.gt(12), R.lt(20))
+     *
+     *   isTeen(13) //=> true
+     *   isTeen(45) //=> false
+     *
      * ```
      *
      * If more arguments are passed to the returned function than transformer functions, those
@@ -722,7 +766,8 @@
      *
      * @func
      * @memberOf R
-     * @category Array
+     * @category core
+     * @category List
      * @sig [a] -> [a]
      * @param {Array} list The list to clone.
      * @return {Array} A new copy of the original list.
@@ -751,7 +796,7 @@
      *
      * @func
      * @memberOf R
-     * @category Array
+     * @category List
      * @sig [a] -> Boolean
      * @param {Array} list The array to consider.
      * @return {boolean} `true` if the `list` argument has a length of 0 or
@@ -775,7 +820,8 @@
      *
      * @func
      * @memberOf R
-     * @category Array
+     * @category core
+     * @category List
      * @sig a -> [a] -> [a]
      * @param {*} el The item to add to the head of the output list.
      * @param {Array} list The array to add to the tail of the output list.
@@ -791,7 +837,7 @@
     /**
      * @func
      * @memberOf R
-     * @category Array
+     * @category List
      * @see R.prepend
      */
     R.cons = R.prepend;
@@ -803,7 +849,8 @@
      *
      * @func
      * @memberOf R
-     * @category Array
+     * @category core
+     * @category List
      * @sig [a] -> a
      * @param {Array} [list=[]] The array to consider.
      * @return {*} The first element of the list, or `undefined` if the list is empty.
@@ -819,7 +866,7 @@
     /**
      * @func
      * @memberOf R
-     * @category Array
+     * @category List
      * @see R.head
      */
     R.car = R.head;
@@ -830,7 +877,7 @@
      *
      * @func
      * @memberOf R
-     * @category Array
+     * @category List
      * @sig [a] -> a
      * @param {Array} [list=[]] The array to consider.
      * @return {*} The last element of the list, or `undefined` if the list is empty.
@@ -850,7 +897,8 @@
      *
      * @func
      * @memberOf R
-     * @category Array
+     * @category core
+     * @category List
      * @sig [a] -> [a]
      * @param {Array} [list=[]] The array to consider.
      * @return {Array} A new array containing all but the first element of the input list, or an
@@ -867,7 +915,7 @@
     /**
      * @func
      * @memberOf R
-     * @category Array
+     * @category List
      * @see R.tail
      */
     R.cdr = R.tail;
@@ -879,7 +927,8 @@
      *
      * @func
      * @memberOf R
-     * @category Array
+     * @category core
+     * @category List
      * @sig a -> [a] -> [a]
      * @param {*} el The element to add to the end of the new list.
      * @param {Array} list The list whose contents will be added to the beginning of the output
@@ -898,7 +947,7 @@
     /**
      * @func
      * @memberOf R
-     * @category Array
+     * @category List
      * @see R.append
      */
     R.push = R.append;
@@ -910,14 +959,15 @@
      *
      * @func
      * @memberOf R
-     * @category Array
+     * @category core
+     * @category List
      * @sig [a] -> [a] -> [a]
      * @param {Array} list1 The first list to merge.
      * @param {Array} list2 The second set to merge.
      * @return {Array} A new array consisting of the contents of `list1` followed by the
-     *         contents of `list2`. If, instead of an {Array} for `list1`, you pass an
+     *         contents of `list2`. If, instead of an Array for `list1`, you pass an
      *         object with a `concat` method on it, `concat` will call `list1.concat`
-     *         and it the value of `list2`.
+     *         and pass it the value of `list2`.
      * @example
      *
      *      R.concat([], []); //=> []
@@ -927,12 +977,10 @@
     R.concat = curry2(function(set1, set2) {
         if (isArray(set2)) {
             return concat(set1, set2);
-        } else if (R.is(String, set1)) {
+        } else if (hasMethod('concat', set1)) {
             return set1.concat(set2);
-        } else if (hasMethod('concat', set2)) {
-            return set2.concat(set1);
         } else {
-            throw new TypeError("can't concat " + typeof set2);
+            throw new TypeError("can't concat " + typeof set1);
         }
     });
 
@@ -1000,7 +1048,7 @@
      *
      * @func
      * @memberOf R
-     * @category Array
+     * @category List
      * @sig a -> n -> [a]
      * @param {*} value The value to repeat.
      * @param {number} n The desired size of the output list.
@@ -1067,6 +1115,7 @@
      *
      * @func
      * @memberOf R
+     * @category core
      * @category Function
      * @sig ((y -> z), (x -> y), ..., (b -> c), (a... -> b)) -> (a... -> z)
      * @param {...Function} functions A variable number of functions.
@@ -1085,7 +1134,7 @@
      */
     var compose = R.compose = function _compose() {
         switch (arguments.length) {
-            case 0: throw NO_ARGS_EXCEPTION;
+            case 0: throw noArgsException();
             case 1: return arguments[0];
             default:
                 var idx = arguments.length - 1, fn = arguments[idx], length = fn.length;
@@ -1125,7 +1174,7 @@
      *      squareThenDoubleThenTriple(5); //=> 150
      */
     R.pipe = function _pipe() {
-        return compose.apply(this, _slice(arguments).reverse());
+        return compose.apply(this, R.reverse(arguments));
     };
 
 
@@ -1152,7 +1201,7 @@
     var flip = R.flip = function _flip(fn) {
         return function(a, b) {
             switch (arguments.length) {
-                case 0: throw NO_ARGS_EXCEPTION;
+                case 0: throw noArgsException();
                 case 1: return function(b) { return fn.apply(this, [b, a].concat(_slice(arguments, 1))); };
                 default: return fn.apply(this, concat([b, a], _slice(arguments, 2)));
             }
@@ -1315,7 +1364,7 @@
      * @func
      * @memberOf R
      * @category Function
-     * ((* -> *) -> ((* -> *), a...) -> (*, a... -> *)
+     * @sig ((* -> *) -> ((* -> *), a...) -> (*, a... -> *)
      * @param {Function} fn The function to wrap.
      * @param {Function} wrapper The wrapper function.
      * @return {Function} The wrapped function.
@@ -1482,6 +1531,7 @@
      *
      * @func
      * @memberOf R
+     * @category core
      * @category List
      * @sig (a,b -> a) -> a -> [b] -> a
      * @param {Function} fn The iterator function. Receives two values, the accumulator and the
@@ -1527,6 +1577,7 @@
      *
      * @func
      * @memberOf R
+     * @category core
      * @category List
      * @sig (a,b,i,[b] -> a) -> a -> [b] -> a
      * @param {Function} fn The iterator function. Receives four values: the accumulator, the
@@ -1557,6 +1608,7 @@
     /**
      * @func
      * @memberOf R
+     * @category core
      * @category List
      * @alias foldl.idx
      * @see R.reduce.idx
@@ -1579,6 +1631,7 @@
      *
      * @func
      * @memberOf R
+     * @category core
      * @category List
      * @sig (a,b -> a) -> a -> [b] -> a
      * @param {Function} fn The iterator function. Receives two values, the accumulator and the
@@ -1606,6 +1659,7 @@
     /**
      * @func
      * @memberOf R
+     * @category core
      * @category List
      * @see R.reduceRight
      */
@@ -1625,6 +1679,7 @@
      *
      * @func
      * @memberOf R
+     * @category core
      * @category List
      * @sig (a,b,i,[b] -> a -> [b] -> a
      * @param {Function} fn The iterator function. Receives four values: the accumulator, the
@@ -1705,6 +1760,7 @@
      *
      * @func
      * @memberOf R
+     * @category core
      * @category List
      * @sig (a -> b) -> [a] -> [b]
      * @param {Function} fn The function to be called on every element of the input `list`.
@@ -1739,6 +1795,7 @@
      *
      * @func
      * @memberOf R
+     * @category core
      * @category List
      * @sig (a,i,[b] -> b) -> [a] -> [b]
      * @param {Function} fn The function to be called on every element of the input `list`.
@@ -1826,6 +1883,66 @@
             return acc;
         }, {}, keys(obj));
     });
+
+
+    /**
+     * "lifts" a function to be the specified arity, so that it may "map over" that many
+     * lists (or other Functors).
+     *
+     * @func
+     * @memberOf R
+     * @see R.lift
+     * @category Function
+     * @sig Number -> (*... -> *) -> ([*]... -> [*])
+     * @param {Function} fn The function to lift into higher context
+     * @return {Function} The function `fn` applicable to mappable objects.
+     * @example
+     *
+     *     var madd3 = R.liftN(3, R.curryN(3, function() {
+     *         return R.foldl(R.add, 0, arguments);
+     *     }));
+     *     madd3([1,2,3], [1,2,3], [1]); //=> [3, 4, 5, 4, 5, 6, 5, 6, 7]
+     */
+    R.liftN = curry2(function liftN(arity, fn) {
+        var lifted = curryN(arity, fn);
+        if (arguments.length === 0) {
+            throw noArgsException();
+        }
+        return R.curryN(arity, function() {
+            return R.foldl(R.ap, R.map(lifted, arguments[0]), _slice(arguments, 1));
+        });
+    });
+
+
+    /**
+     * "lifts" a function of arity > 1 so that it may "map over" an Array or
+     * other Functor.
+     *
+     * @func
+     * @memberOf R
+     * @see R.liftN
+     * @category Function
+     * @sig (*... -> *) -> ([*]... -> [*])
+     * @param {Function} fn The function to lift into higher context
+     * @return {Function} The function `fn` applicable to mappable objects.
+     * @example
+     *
+     *     var madd3 = R.lift(R.curryN(3, function(a, b, c) {
+     *         return a + b + c;
+     *     }));
+     *     madd3([1,2,3], [1,2,3], [1]); //=> [3, 4, 5, 4, 5, 6, 5, 6, 7]
+     *
+     *     var madd5 = R.lift(R.curryN(5, function(a, b, c, d, e) {
+     *         return a + b + c + d + e;
+     *     }));
+     *     madd5([1,2], [3], [4, 5], [6], [7, 8]); //=> [21, 22, 22, 23, 22, 23, 23, 24]
+     */
+    R.lift = function lift(fn) {
+        if (arguments.length === 0) {
+            throw noArgsException();
+        }
+        return R.liftN(fn.length, fn);
+    };
 
 
     /**
@@ -1953,6 +2070,7 @@
      *
      * @func
      * @memberOf R
+     * @category core
      * @category List
      * @sig (a -> Boolean) -> [a] -> [a]
      * @param {Function} fn The function called per iteration.
@@ -1984,6 +2102,7 @@
      *
      * @func
      * @memberOf R
+     * @category core
      * @category List
      * @sig (a, i, [a] -> Boolean) -> [a] -> [a]
      * @param {Function} fn The function called per iteration.
@@ -2344,7 +2463,7 @@
      *
      * @private
      * @category Internal
-     * @param {Array} The array to search
+     * @param {Array} list The array to search
      * @param {*} item the item to find in the Array
      * @param {Number} from (optional) the index to start searching the Array
      * @return {Number} the index of the found item, or -1
@@ -2807,7 +2926,7 @@
      * @memberOf R
      * @category List
      * @sig [[k,v]] -> {k: v}
-     * @param {Array} An array of two-element arrays that will be the keys and values of the ouput object.
+     * @param {Array} pairs An array of two-element arrays that will be the keys and values of the output object.
      * @return {Object} The object made by pairing up `keys` and `values`.
      * @example
      *
@@ -2916,8 +3035,14 @@
      *      R.reverse([1]);        //=> [1]
      *      R.reverse([]);         //=> []
      */
-    R.reverse = function _reverse(list) {
-        return clone(list || []).reverse();
+    R.reverse = function reverse(list) {
+        var idx = -1, length = list.length;
+        var pointer = length;
+        var result = new Array(length);
+        while (++idx < length) {
+            result[--pointer] = list[idx];
+        }
+        return result;
     };
 
 
@@ -2966,7 +3091,7 @@
      *      spacer(['a', 2, 3.4]);   //=> 'a 2 3.4'
      *      R.join('|', [1, 2, 3]);    //=> '1|2|3'
      */
-    R.join = invoker('join', Array.prototype);
+    R.join = invoker(Array.prototype.join);
 
 
     /**
@@ -2985,7 +3110,7 @@
      *      var xs = R.range(0, 10);
      *      R.slice(2, 5)(xs); //=> [2, 3, 4]
      */
-    R.slice = invoker('slice', Array.prototype);
+    R.slice = invoker(Array.prototype.slice);
 
 
     /**
@@ -3066,7 +3191,7 @@
      * @memberOf R
      * @category List
      * @sig Number -> [a] -> [a] -> [a]
-     * @param {Number} index The position to insert the sublist
+     * @param {Number} index The position to insert the sub-list
      * @param {Array} elts The sub-list to insert into the Array
      * @param {Array} list The list to insert the sub-list into
      * @return {Array} a new Array with `elts` inserted starting at `index`
@@ -3129,7 +3254,7 @@
 
 
     /**
-     * Splits a list into sublists stored in an object, based on the result of calling a String-returning function
+     * Splits a list into sub-lists stored in an object, based on the result of calling a String-returning function
      * on each element, and grouping the results according to values returned.
      *
      * @func
@@ -3269,7 +3394,7 @@
      */
     var prop = R.prop = function prop(p, obj) {
         switch (arguments.length) {
-            case 0: throw NO_ARGS_EXCEPTION;
+            case 0: throw noArgsException();
             case 1: return function _prop(obj) { return obj[p]; };
         }
         return obj[p];
@@ -3330,15 +3455,69 @@
      *        age: 101
      *      };
      *      var favorite = R.prop('favoriteLibrary');
-     *      var favoriteWithDefault = R.propOrDefault('favoriteLibrary', 'Ramda');
+     *      var favoriteWithDefault = R.propOr('favoriteLibrary', 'Ramda');
      *
      *      favorite(alice);  //=> undefined
      *      favoriteWithDefault(alice);  //=> 'Ramda'
      */
-    R.propOrDefault = curry3(function _propOrDefault(p, val, obj) {
+    R.propOr = curry3(function _propOrDefault(p, val, obj) {
         return hasOwnProperty.call(obj, p) ? obj[p] : val;
     });
 
+    /**
+     * Returns whether or not an object has an own property with
+     * the specified name
+     *
+     * @func
+     * @memberOf R
+     * @category Object
+     * @sig s -> {s: x} -> Boolean
+     * @param {String} prop The name of the property to check for.
+     * @param {Object} obj The object to query.
+     * @return {Boolean} Whether the property exists.
+     * @example
+     *
+     *      var obj = {
+     *        foo: 1,
+     *        bar: 2,
+     *      };
+     *      R.has('foo', obj);  //=> true
+     *
+     *      var list = [{foo: 1}, {foo: 2}, {bar: 3}];
+     *      R.filter(R.has('foo'), list);  //=> [{foo: 1}, {foo: 2}]
+     */
+    R.has = curry2(function(prop, obj) {
+        return hasOwnProperty.call(obj, prop);
+    });
+
+    /**
+     * Returns whether or not an object or its prototype chain has
+     * a property with the specified name
+     *
+     * @func
+     * @memberOf R
+     * @category Object
+     * @sig s -> {s: x} -> Boolean
+     * @param {String} prop The name of the property to check for.
+     * @param {Object} obj The object to query.
+     * @return {Boolean} Whether the property exists.
+     * @example
+     *
+     *      function Rectangle(width, height) {
+     *          this.width = width;
+     *          this.height = height;
+     *      }
+     *      Rectangle.prototype.area = function() {
+     *          return this.width * this.height;
+     *      };
+     *
+     *      var square = new Rectangle(2, 2);
+     *      R.hasIn('width', square);  //=> true
+     *      R.hasIn('area', square);  //=> true
+     */
+    R.hasIn = curry2(function(prop, obj) {
+        return prop in obj;
+    });
 
     /**
      * Calls the specified function on the supplied object. Any additional arguments
@@ -3349,7 +3528,7 @@
      * @memberOf R
      * @category Object
      * @sig k -> {k : v} -> v(*)
-     * @param {String} fn The name of the property mapped to the function to invoke
+     * @param {String} funcName The name of the property mapped to the function to invoke
      * @param {Object} obj The object
      * @return {*} The value of invoking `obj.fn`
      * @example
@@ -3361,7 +3540,7 @@
      */
     R.func = function _func(funcName, obj) {
         switch (arguments.length) {
-            case 0: throw NO_ARGS_EXCEPTION;
+            case 0: throw noArgsException();
             case 1: return function(obj) { return obj[funcName].apply(obj, _slice(arguments, 1)); };
             default: return obj[funcName].apply(obj, _slice(arguments, 2));
         }
@@ -3399,6 +3578,26 @@
     var nativeKeys = Object.keys;
 
     /**
+     * Creates a function that is bound to a context.
+     * Note: `R.bind` does not provide the additional argument-binding capabilities of
+     * [Function.prototype.bind](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/bind).
+     *
+     * @func
+     * @memberOf R
+     * @category Function
+     * @category Object
+     * @sig (* -> *) -> {*} -> (* -> *)
+     * @param {Function} fn The function to bind to context
+     * @param {Object} thisObj The context to bind `fn` to
+     * @return {Function} A function that will execute in the context of `thisObj`
+     */
+    R.bind = curry2(function bind(fn, thisObj) {
+        return function() {
+            return fn.apply(thisObj, arguments);
+        };
+    });
+
+    /**
      * Returns a list containing the names of all the enumerable own
      * properties of the supplied object.
      * Note that the order of the output array is not guaranteed to be
@@ -3421,11 +3620,11 @@
                                   'propertyIsEnumerable', 'hasOwnProperty', 'toLocaleString'];
 
         return function _keys(obj) {
-            if (!R.is(Object, obj)) {
+            if (Object(obj) !== obj) {
                 return [];
             }
             if (nativeKeys) {
-                return nativeKeys(Object(obj));
+                return nativeKeys(obj);
             }
             var prop, ks = [], nIdx;
             for (prop in obj) {
@@ -3613,7 +3812,7 @@
      * @memberOf R
      * @category Object
      * @sig [k] -> {k: v} -> {k: v}
-     * @param {Array} names an array of String propery names to copy onto a new object
+     * @param {Array} names an array of String property names to copy onto a new object
      * @param {Object} obj The object to copy from
      * @return {Object} A new object with only properties from `names` on it.
      * @example
@@ -3635,7 +3834,7 @@
      * @memberOf R
      * @category Object
      * @sig [k] -> {k: v} -> {k: v}
-     * @param {Array} names an array of String propery names to omit from the new object
+     * @param {Array} names an array of String property names to omit from the new object
      * @param {Object} obj The object to copy from
      * @return {Object} A new object with properties from `names` not on it.
      * @example
@@ -3694,7 +3893,7 @@
      * @memberOf R
      * @category Object
      * @sig [k] -> {k: v} -> {k: v}
-     * @param {Array} names an array of String propery names to copy onto a new object
+     * @param {Array} names an array of String property names to copy onto a new object
      * @param {Object} obj The object to copy from
      * @return {Object} A new object with only properties from `names` on it.
      * @see R.pick
@@ -3708,12 +3907,12 @@
 
     /**
      * Assigns own enumerable properties of the other object to the destination
-     * object prefering items in other.
+     * object preferring items in other.
      *
      * @private
      * @memberOf R
      * @category Object
-     * @param {Object} object The destination object.
+     * @param {Object} destination The destination object.
      * @param {Object} other The other object to merge with destination.
      * @returns {Object} Returns the destination object.
      * @example
@@ -3741,7 +3940,7 @@
      * @category Object
      * @sig {k: v} -> {k: v} -> {k: v}
      * @param {Object} a source object
-     * @param {Object} b object with higher precendence in output
+     * @param {Object} b object with higher precedence in output
      * @returns {Object} Returns the destination object.
      * @example
      *
@@ -3838,7 +4037,7 @@
      * If the spec has a property mapped to a function, then `where` evaluates the function, passing in
      * the test object's value for the property in question, as well as the whole test object.
      *
-     * `where` is well suited to declarativley expressing constraints for other functions, e.g.,
+     * `where` is well suited to declaratively expressing constraints for other functions, e.g.,
      * `filter`, `find`, `pickWith`, etc.
      *
      * @func
@@ -3867,7 +4066,7 @@
         }, keys(spec));
 
         switch (arguments.length) {
-            case 0: throw NO_ARGS_EXCEPTION;
+            case 0: throw noArgsException();
             case 1:
                 return function(testObj) {
                     return satisfiesSpec(spec, parsedSpec, testObj);
@@ -3930,8 +4129,8 @@
      *      R.is(Object, 's'); //=> false
      *      R.is(Number, {}); //=> false
      */
-    R.is = curry2(function is(ctor, val) {
-        return val != null && val.constructor === ctor || val instanceof ctor;
+    R.is = curry2(function is(Ctor, val) {
+        return val != null && val.constructor === Ctor || val instanceof Ctor;
     });
 
 
@@ -4086,7 +4285,7 @@
                 }, preds);
             };
             return arguments.length > 1 ?
-                    // Call function imediately if given arguments
+                    // Call function immediately if given arguments
                     predIterator.apply(null, _slice(arguments, 1)) :
                     // Return a function which will call the predicates with the provided arguments
                     arity(max(pluck('length', preds)), predIterator);
@@ -4138,7 +4337,32 @@
      */
     R.anyPredicates = predicateWrap(some);
 
-
+    /**
+     * Creates a function that will process either the `onTrue` or the `onFalse` function depending
+     * upon the result of the `condition` predicate.
+     *
+     * @func
+     * @memberOf R
+     * @category logic
+     * @sig (*... -> Boolean) -> (*... -> *) -> (*... -> *) -> (*... -> *)
+     * @param {Function} condition A condition function
+     * @param {Function} onTrue A predicate to invoke when the condition evaluates to a truthy value
+     * @param {Function} onFalse A predicate to invoke when the condition evaluates to a falsy value
+     * @returns {Function} a function that validates the arguments before executing "truthy"
+     *                     predicate or the the "falsey" predicate.
+     * @example
+     *
+     *      // Flatten all arrays in the list and return whatever is not an array
+     *      var flattenArrays = R.map(R.cond(Array.isArray, R.flatten, R.identity));
+     *
+     *      flattenArrays([[0], [[10], [8]], 1234, {}]); //=> [[0], [10, 8], 1234, {}]
+     *      flattenArrays([[[10], 123], [8, [10]], "hello"]); //=> [[10, 123], [8, 10], "hello"]
+     */
+    R.cond = curry3(function(condition, onTrue, onFalse) {
+        return function _cond() {
+            return condition.apply(this, arguments) ? onTrue.apply(this, arguments) : onFalse.apply(this, arguments);
+        };
+    });
 
 
     // Arithmetic Functions
@@ -4200,16 +4424,17 @@
      * @param {number} a The first value.
      * @param {number} b The second value.
      * @return {number} The result of `a - b`.
-     * @note Operator: this is right-curried by default, but can be called via sections
+     * @note Operator: Since this is a non-commutative infix operator converted to prefix, it can
+     *                 be curried right by explicitly passing `undefined` for its first argument.
      * @example
      *
      *      R.subtract(10, 8); //=> 2
      *
-     *      var minus5 = R.subtract(5);
+     *      var minus5 = R.subtract(__, 5); // '__' stands for any `undefined` value
      *      minus5(17); //=> 12
      *
      *      // note: In this example, `_`  is just an `undefined` value.  You could use `void 0` instead
-     *      var complementaryAngle = R.subtract(90, _);
+     *      var complementaryAngle = R.subtract(90);
      *      complementaryAngle(30); //=> 60
      *      complementaryAngle(72); //=> 18
      */
@@ -4218,8 +4443,6 @@
 
     /**
      * Divides two numbers. Equivalent to `a / b`.
-     * While at times the curried version of `divide` might be useful,
-     * probably the curried version of `divideBy` will be more useful.
      *
      * @func
      * @memberOf R
@@ -4228,16 +4451,17 @@
      * @param {number} a The first value.
      * @param {number} b The second value.
      * @return {number} The result of `a / b`.
-     * @note Operator: this is right-curried by default, but can be called via sections
+     * @note Operator: Since this is a non-commutative infix operator converted to prefix, it can
+     *                 be curried right by explicitly passing `undefined` for its first argument.
      * @example
      *
      *      R.divide(71, 100); //=> 0.71
      *
-     *      // note: In this example, `_`  is just an `undefined` value.  You could use `void 0` instead
-     *      var half = R.divide(2);
+     *      // note: In this example, `__`  is just an `undefined` value.  You could use `void 0` instead
+     *      var half = R.divide(__, 2);
      *      half(42); //=> 21
      *
-     *      var reciprocal = R.divide(1, _);
+     *      var reciprocal = R.divide(1);
      *      reciprocal(4);   //=> 0.25
      */
     R.divide = op(function _divide(a, b) { return a / b; });
@@ -4255,7 +4479,8 @@
      * @param {number} a The value to the divide.
      * @param {number} b The pseudo-modulus
      * @return {number} The result of `b % a`.
-     * @note Operator: this is right-curried by default, but can be called via sections
+     * @note Operator: Since this is a non-commutative infix operator converted to prefix, it can
+     *                 be curried right by explicitly passing `undefined` for its first argument.
      * @see R.mathMod
      * @example
      *
@@ -4264,7 +4489,7 @@
      *      R.modulo(-17, 3); //=> -2
      *      R.modulo(17, -3); //=> 2
      *
-     *      var isOdd = R.modulo(2);
+     *      var isOdd = R.modulo(__, 2);
      *      isOdd(42); //=> 0
      *      isOdd(21); //=> 1
      */
@@ -4299,6 +4524,8 @@
      * @param {number} p the modulus.
      * @return {number} The result of `b mod a`.
      * @see R.moduloBy
+     * @note Operator: Since this is a non-commutative infix operator converted to prefix, it can
+     *                 be curried right by explicitly passing `undefined` for its first argument.
      * @example
      *
      *      R.mathMod(-17, 5);  //=> 3
@@ -4308,12 +4535,12 @@
      *      R.mathMod(17.2, 5); //=> NaN
      *      R.mathMod(17, 5.3); //=> NaN
      *
-     *      var clock = R.mathMod(12);
+     *      var clock = R.mathMod(__, 12);
      *      clock(15); //=> 3
      *      clock(24); //=> 0
      *
      *      // note: In this example, `_`  is just an `undefined` value.  You could use `void 0` instead
-     *      var seventeenMod = R.mathMod(17, _);
+     *      var seventeenMod = R.mathMod(17);
      *      seventeenMod(3);  //=> 2
      *      seventeenMod(4);  //=> 1
      *      seventeenMod(10); //=> 7
@@ -4323,7 +4550,6 @@
         if (!isInteger(p) || p < 1) { return NaN; }
         return ((m % p) + p) % p;
     });
-
 
 
     /**
@@ -4370,14 +4596,15 @@
      * @param {Number} a
      * @param {Number} b
      * @return {Boolean} a < b
-     * @note Operator: this is right-curried by default, but can be called via sections
+     * @note Operator: Since this is a non-commutative infix operator converted to prefix, it can
+     *                 be curried right by explicitly passing `undefined` for its first argument.
      * @example
      *
      *      R.lt(2, 6); //=> true
      *      R.lt(2, 0); //=> false
      *      R.lt(2, 2); //=> false
-     *      R.lt(5)(10); //=> false // default currying is right-sectioned
-     *      R.lt(5, _)(10); //=> true // left-sectioned currying
+     *      R.lt(5)(10); //=> true
+     *      R.lt(__, 5)(10); //=> false // right-sectioned currying
      */
     R.lt = op(function _lt(a, b) { return a < b; });
 
@@ -4392,12 +4619,16 @@
      * @param {Number} a
      * @param {Number} b
      * @return {Boolean} a <= b
-     * @note Operator: this is right-curried by default, but can be called via sections
+     * @note Operator: Since this is a non-commutative infix operator converted to prefix, it can
+     *                 be curried right by explicitly passing `undefined` for its first argument.
      * @example
      *
      *      R.lte(2, 6); //=> true
      *      R.lte(2, 0); //=> false
      *      R.lte(2, 2); //=> true
+     *      R.lte(__, 2)(1); //=> true
+     *      R.lte(2)(10); //=> true
+     *      R.lte(__)(5, 4) // => true
      */
     R.lte = op(function _lte(a, b) { return a <= b; });
 
@@ -4412,12 +4643,16 @@
      * @param {Number} a
      * @param {Number} b
      * @return {Boolean} a > b
-     * @note Operator: this is right-curried by default, but can be called via sections
+     * @note Operator: Since this is a non-commutative infix operator converted to prefix, it can
+     *                 be curried right by explicitly passing `undefined` for its first argument.
      * @example
      *
      *      R.gt(2, 6); //=> false
      *      R.gt(2, 0); //=> true
      *      R.gt(2, 2); //=> false
+     *      R.gt(__, 2)(10); //=> true
+     *      R.gt(2)(10); //=> false
+     *      R.lte(__)(4, 5) // => true
      */
     R.gt = op(function _gt(a, b) { return a > b; });
 
@@ -4438,6 +4673,9 @@
      *      R.gte(2, 6); //=> false
      *      R.gte(2, 0); //=> true
      *      R.gte(2, 2); //=> true
+     *      R.gte(__, 6)(2); //=> false
+     *      R.gte(2)(0); //=> true
+     *      R.gte(__)(1, 2); //=> true
      */
     R.gte = op(function _gte(a, b) { return a >= b; });
 
@@ -4571,7 +4809,7 @@
      *
      *      R.substring(2, 5, 'abcdefghijklm'); //=> 'cde'
      */
-    var substring = R.substring = invoker('substring', String.prototype);
+    var substring = R.substring = invoker(String.prototype.substring);
 
 
     /**
@@ -4625,7 +4863,7 @@
      *
      *      R.charAt(8, 'abcdefghijklm'); //=> 'i'
      */
-    R.charAt = invoker('charAt', String.prototype);
+    R.charAt = invoker(String.prototype.charAt);
 
 
     /**
@@ -4644,11 +4882,11 @@
      *      R.charCodeAt(8, 'abcdefghijklm'); //=> 105
      *      // (... 'a' ~ 97, 'b' ~ 98, ... 'i' ~ 105)
      */
-    R.charCodeAt = invoker('charCodeAt', String.prototype);
+    R.charCodeAt = invoker(String.prototype.charCodeAt);
 
 
     /**
-     * Tests a regular expression agains a String
+     * Tests a regular expression against a String
      *
      * @func
      * @memberOf R
@@ -4662,7 +4900,7 @@
      *
      *      R.match(/([a-z]a)/g, 'bananas'); //=> ['ba', 'na', 'na']
      */
-    R.match = invoker('match', String.prototype);
+    R.match = invoker(String.prototype.match);
 
 
     /**
@@ -4719,7 +4957,7 @@
      *
      *      R.toUpperCase('abc'); //=> 'ABC'
      */
-    R.toUpperCase = invoker('toUpperCase', String.prototype);
+    R.toUpperCase = invoker(String.prototype.toUpperCase);
 
 
     /**
@@ -4735,7 +4973,38 @@
      *
      *      R.toLowerCase('XYZ'); //=> 'xyz'
      */
-    R.toLowerCase = invoker('toLowerCase', String.prototype);
+    R.toLowerCase = invoker(String.prototype.toLowerCase);
+
+
+    /**
+     * Removes whitespace from both ends of the string.
+     *
+     * @func
+     * @memberOf R
+     * @category string
+     * @sig String -> String
+     * @param {String} str The string to trim.
+     * @returns {String} Trimmed version of `str`.
+     * @example
+     *
+     *      R.trim('   xyz  '); //=> 'xyz'
+     *      R.map(R.trim, R.split(',', 'x, y, z')); //=> ['x', 'y', 'z']
+     */
+    R.trim = (function() {
+        var ws = '\x09\x0A\x0B\x0C\x0D\x20\xA0\u1680\u180E\u2000\u2001\u2002\u2003' +
+            '\u2004\u2005\u2006\u2007\u2008\u2009\u200A\u202F\u205F\u3000\u2028' +
+            '\u2029\uFEFF';
+        var zeroWidth = '\u200b';
+        var hasProtoTrim = (typeof String.prototype.trim === 'function');
+        if (!hasProtoTrim || (ws.trim() || !zeroWidth.trim())) {
+            return function _trim(str) {
+                var beginRx = new RegExp('^[' + ws + '][' + ws + ']*');
+                var endRx = new RegExp('[' + ws + '][' + ws + ']*$');
+                return str.replace(beginRx, '').replace(endRx, '');
+            };
+        }
+        return function trim(str) { return str.trim(str); };
+    }());
 
 
     /**
@@ -4756,7 +5025,7 @@
      *
      *      R.split('.', 'a.b.c.xyz.d'); //=> ['a', 'b', 'c', 'xyz', 'd']
      */
-    R.split = invoker('split', String.prototype, 1);
+    R.split = invokerN(1, String.prototype.split);
 
 
     /**
@@ -4786,7 +5055,7 @@
 
 
     /**
-     * Retrieve a nested path on an object seperated by the specified
+     * Retrieve a nested path on an object separated by the specified
      * separator value.
      *
      * @func
@@ -4806,7 +5075,7 @@
 
 
     /**
-     * Retrieve a nested path on an object seperated by periods
+     * Retrieve a nested path on an object separated by periods
      *
      * @func
      * @memberOf R
@@ -4820,6 +5089,33 @@
      */
     R.path = R.pathOn('.');
 
+
+    /**
+     * Determines whether a nested path on an object, seperated by periods,
+     * has a specific value according to strict equality ('==='). Most
+     * likely used to filter a list:
+     *
+     * @func
+     * @memberOf R
+     * @category relation
+     * @sig String -> v -> {k: v} -> Boolean
+     * @param {string} path The path of the nested property to use
+     * @param {*} val The value to compare the nested property with
+     * @param {k: v} obj obj The object to check the nested property in
+     * @return {boolean} `true` if the value equals the nested object property,
+     *     `false` otherwise.
+     * @example
+     *
+     *     var user1 = { address: { zipCode: 90210 } };
+     *     var user2 = { address: { zipCode: 55555 } };
+     *     var user3 = { name: 'Bob' };
+     *     var users = [ user1, user2, user3 ]
+     *     var isFamous = R.pathEq('address.zipCode', 90210);
+     *     R.filter(isFamous, users); //=> [ user1 ]
+     */
+    R.pathEq = curry3(function(path, val, obj) {
+        return R.eq(val, R.path(path, obj));
+    });
 
 
     // Data Analysis and Grouping Functions
@@ -5080,6 +5376,20 @@
         return map(function(item) {return {key: fn(item), val: item};}, list);
     }
 
+    /**
+     * Compare two items from a list generated from the `keyValue`
+     * function. Used internally by sortBy.
+     *
+     * @private
+     * @func
+     * @category relation
+     * @param {*} a
+     * @param {*} b
+     */
+    var compareKeys = comparator(function(a, b) {
+        return a.key < b.key;
+    });
+
 
     /**
      * Sorts the list according to a key generated by the supplied function.
@@ -5113,7 +5423,7 @@
      *      sortByNameCaseInsensitive(people); //=> [alice, bob, clara]
      */
     R.sortBy = curry2(function sortBy(fn, list) {
-        return pluck('val', keyValue(fn, list).sort(comparator(function(a, b) {return a.key < b.key;})));
+        return pluck('val', keyValue(fn, list).sort(compareKeys));
     });
 
 
@@ -5167,7 +5477,7 @@
      * @category Object
      * @sig {*} -> [String]
      * @param {Object} obj The objects with functions in it
-     * @return {Array} returns a list of the object's own properites that map to functions
+     * @return {Array} returns a list of the object's own properties that map to functions
      * @example
      *
      *      R.functions(R); // returns list of ramda's own function names
@@ -5188,7 +5498,7 @@
      * @category Object
      * @sig {*} -> [String]
      * @param {Object} obj The objects with functions in it
-     * @return {Array} returns a list of the object's own properites and prototype
+     * @return {Array} returns a list of the object's own properties and prototype
      *                 properties that map to functions
      * @example
      *

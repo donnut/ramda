@@ -2,60 +2,47 @@ var assert = require('assert');
 var types = require('./types');
 var R = require('../../..');
 
-var Maybe = require('../Maybe');
+var Identity = require('../Identity');
 
-describe('Maybe', function() {
-    var m = Maybe.Just(1);
-    var maybeNull = Maybe.Nothing();
+describe('Identity', function() {
+    var m = Identity(1);
 
     it('is a Functor', function() {
         var fTest = types.functor;
         assert.equal(true, fTest.iface(m));
         assert.equal(true, fTest.id(m));
         assert.equal(true, fTest.compose(m, R.multiply(2), R.add(3)));
-        assert.equal(true, fTest.iface(maybeNull));
-        assert.equal(true, fTest.id(maybeNull));
-        assert.equal(true, fTest.compose(maybeNull, R.multiply(2), R.add(3)));
     });
 
     it('is an Apply', function() {
         var aTest = types.apply;
-        var appA = Maybe(R.multiply(10));
-        var appU = Maybe(R.add(7));
-        var appV = Maybe.Just(10);
+        var appA = Identity(R.multiply(10));
+        var appU = Identity(R.add(7));
+        var appV = Identity(10);
 
         assert.equal(true, aTest.iface(appA));
         assert.equal(true, aTest.compose(appA, appU, appV));
-        assert.equal(true, aTest.iface(maybeNull));
     });
 
     it('is an Applicative', function() {
         var aTest = types.applicative;
-        var app1 = Maybe.Just(101);
-        var app2 = Maybe.Just(-123);
-        var appF = Maybe(R.multiply(3));
+        var app1 = Identity(101);
+        var app2 = Identity(-123);
+        var appF = Identity(R.multiply(3));
 
         assert.equal(true, aTest.iface(app1));
         assert.equal(true, aTest.id(app1, app2));
-        assert.equal(true, aTest.id(app1, maybeNull));
         assert.equal(true, aTest.homomorphic(app1, R.add(3), 46));
         assert.equal(true, aTest.interchange(app2, appF, 17));
-
-        assert.equal(true, aTest.iface(maybeNull));
-        assert.equal(true, aTest.id(maybeNull, Maybe(null)));
-        assert.equal(true, aTest.homomorphic(maybeNull, R.add(3), 46));
-        assert.equal(true, aTest.interchange(maybeNull, appF, 17));
-
     });
 
     it('is a Chain', function() {
         var cTest = types.chain;
-        var f1 = function(x) {return Maybe(3 * x);};
-        var f2 = function(x) {return Maybe(5 + x);};
-        var fNull = function() {return Maybe(null);};
+        var f1 = function(x) {return Identity(3 * x);};
+        var f2 = function(x) {return Identity(5 + x);};
+        var fNull = function() {return Identity(null);};
         assert.equal(true, cTest.iface(m));
         assert.equal(true, cTest.associative(m, f1, f2));
-        assert.equal(true, cTest.iface(maybeNull));
         assert.equal(true, cTest.associative(m, fNull, f2));
         assert.equal(true, cTest.associative(m, f1, fNull));
         assert.equal(true, cTest.associative(m, fNull, fNull));
@@ -64,6 +51,17 @@ describe('Maybe', function() {
     it('is a Monad', function() {
         var mTest = types.monad;
         assert.equal(true, mTest.iface(m));
+    });
+});
+
+describe('Identity example', function() {
+
+    it('returns wrapped value', function() {
+        var identNumber = Identity(4);
+        assert.equal(identNumber.get(), 4);
+
+        var identArray = Identity([1, 2, 3, 4]);
+        assert.deepEqual(identArray.get(), [1, 2, 3, 4]);
     });
 
 });

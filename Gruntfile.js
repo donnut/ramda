@@ -38,55 +38,25 @@ module.exports = function(grunt) {
         },
 
         jscs: {
-            files: ['*.js', 'ext/**/*.js', 'test/*.js'],
+            files: ['**/*.js', '!{lib/test,node_modules,sauce}/**'],
             options: {
-                disallowKeywordsOnNewLine: ['else', 'catch', 'finally'],
-                disallowMixedSpacesAndTabs: true,
-                disallowMultipleLineStrings: true,
-                disallowQuotedKeysInObjects: 'allButReserved',
-                disallowSpaceAfterObjectKeys: true,
-                disallowSpaceAfterPrefixUnaryOperators: ['++', '--', '+', '-', '~', '!'],
-                disallowSpaceBeforePostfixUnaryOperators: ['++', '--'],
-                disallowSpacesInFunction: {beforeOpeningRoundBrace: true},
-                disallowSpacesInsideArrayBrackets: true,
-                disallowSpacesInsideObjectBrackets: true,
-                disallowSpacesInsideParentheses: true,
-                disallowTrailingWhitespace: true,
-                disallowYodaConditions: true,
-                requireCapitalizedConstructors: true,
-                requireCommaBeforeLineBreak: true,
-                requireCurlyBraces: ['if', 'else', 'for', 'while', 'do', 'try', 'catch', 'finally'],
-                requireDotNotation: true,
-                requireLineFeedAtFileEnd: true,
-                requireParenthesesAroundIIFE: true,
-                requireSpaceAfterBinaryOperators: ['+', '-', '/', '*', '=', '==', '===', '!=', '!==', '>', '>=', '<', '<=', ',', ':'],
-                requireSpaceAfterKeywords: ['if', 'else', 'for', 'while', 'do', 'switch', 'return', 'try', 'catch', 'finally'],
-                requireSpaceAfterLineComment: true,
-                requireSpaceBeforeBinaryOperators: ['+', '-', '/', '*', '=', '==', '===', '!=', '!==', '>', '>=', '<', '<='],
-                requireSpaceBeforeBlockStatements: true,
-                requireSpacesInConditionalExpression: true,
-                requireSpacesInFunction: {beforeOpeningCurlyBrace: true},
-                validateIndentation: 4,
-                validateLineBreaks: 'LF',
-                validateQuoteMarks: {escape: true, mark: "'"}
+                config: '.jscsrc',
+                excludeFiles: ['**/*.min.js']
             }
         },
 
         jshint: {
-            files: ['ramda.js', 'ext/**/*.js', 'test/*.js'],
+            files: ['**/*.js', '!{lib/test,node_modules,sauce}/**'],
             options: {
-                evil: true,
-                eqnull: true,
-                predef: ['beforeEach', 'console', 'define', 'describe', 'it', 'module', 'require'],
-                undef: true,
-                unused: true,
+                ignores: ['**/*.min.js'],
+                jshintrc: '.jshintrc'
             }
         },
 
         benchmark: {
             all: {
                 src: ['bench/*.bench.js'],
-                dest: 'bench/report/bench.<%= (new Date()).getTime() %>.json',
+                dest: 'bench/report/bench.<%= (new Date()).getTime() %>.json'
             }
         },
 
@@ -115,15 +85,6 @@ module.exports = function(grunt) {
             }
         },
 
-        jsdoc: {
-            dist: {
-                src: ['*.js'],
-                options: {
-                    destination: 'jsdoc-out'
-                }
-            }
-        },
-
         'saucelabs-mocha': sauceConf,
 
         connect: sauceSrv
@@ -139,9 +100,7 @@ module.exports = function(grunt) {
     grunt.loadNpmTasks('grunt-mocha-test');
     grunt.loadNpmTasks('grunt-push-release');
     grunt.loadNpmTasks('grunt-benchmark');
-    grunt.loadNpmTasks('grunt-readme');
     grunt.loadNpmTasks('grunt-saucelabs');
-    grunt.loadNpmTasks('grunt-jsdoc');
 
     grunt.registerTask('uploadBenchmarks', 'upload benchmark report to orchestrate', function() {
         // upload files in report dir to orchestrate

@@ -20,11 +20,11 @@ describe('prop', function() {
     });
 });
 
-describe('propOrDefault', function() {
+describe('propOr', function() {
     var fred = {name: 'Fred', age: 23};
     var anon = {age: 99};
 
-    var nm = R.propOrDefault('name', 'Unknown');
+    var nm = R.propOr('name', 'Unknown');
 
     it('should return a function that fetches the appropriate property', function() {
         assert.equal(typeof nm, 'function');
@@ -40,11 +40,69 @@ describe('propOrDefault', function() {
         Person.prototype.age = function() {};
 
         var bob = new Person();
-        assert.equal(R.propOrDefault('age', 100, bob), 100);
+        assert.equal(R.propOr('age', 100, bob), 100);
     });
 
     it('throws if given no arguments', function() {
-        assert.throws(R.propOrDefault, TypeError);
+        assert.throws(R.propOr, TypeError);
+    });
+});
+
+describe('has', function() {
+    var fred = {name: 'Fred', age: 23};
+    var anon = {age: 99};
+
+    it('should return a function that checks the appropriate property', function() {
+        var nm = R.has('name');
+        assert.equal(typeof nm, 'function');
+        assert.equal(nm(fred), true);
+        assert.equal(nm(anon), false);
+    });
+
+    it('should not check properties from the prototype chain', function() {
+        var Person = function() {};
+        Person.prototype.age = function() {};
+
+        var bob = new Person();
+        assert.equal(R.has('age', bob), false);
+    });
+
+    it('works properly when called with two arguments', function() {
+        assert.equal(R.has('name', fred), true);
+        assert.equal(R.has('name', anon), false);
+    });
+
+    it('throws if given no arguments', function() {
+        assert.throws(R.has, TypeError);
+    });
+});
+
+describe('hasIn', function() {
+    var fred = {name: 'Fred', age: 23};
+    var anon = {age: 99};
+
+    it('should return a function that checks the appropriate property', function() {
+        var nm = R.hasIn('name');
+        assert.equal(typeof nm, 'function');
+        assert.equal(nm(fred), true);
+        assert.equal(nm(anon), false);
+    });
+
+    it('should check properties from the prototype chain', function() {
+        var Person = function() {};
+        Person.prototype.age = function() {};
+
+        var bob = new Person();
+        assert.equal(R.hasIn('age', bob), true);
+    });
+
+    it('works properly when called with two arguments', function() {
+        assert.equal(R.hasIn('name', fred), true);
+        assert.equal(R.hasIn('name', anon), false);
+    });
+
+    it('throws if given no arguments', function() {
+        assert.throws(R.hasIn, TypeError);
     });
 });
 
