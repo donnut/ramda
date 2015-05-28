@@ -38,10 +38,43 @@ describe('lastIndexOf', function() {
     assert.strictEqual(R.lastIndexOf('x', -5, []), -1);
   });
 
-  it('has Object.is semantics', function() {
-    assert.strictEqual(R.lastIndexOf(-0, [0]), -1);
+  it('has R.equals semantics', function() {
+    function Just(x) { this.value = x; }
+    Just.prototype.equals = function(x) {
+      return x instanceof Just && R.equals(x.value, this.value);
+    };
+
     assert.strictEqual(R.lastIndexOf(0, [-0]), -1);
+    assert.strictEqual(R.lastIndexOf(-0, [0]), -1);
     assert.strictEqual(R.lastIndexOf(NaN, [NaN]), 0);
+    assert.strictEqual(R.lastIndexOf(new Just([42]), [new Just([42])]), 0);
+  });
+
+  it('dispatches to `lastIndexOf` method', function() {
+    function Empty() {}
+    Empty.prototype.lastIndexOf = R.always(-1);
+
+    function List(head, tail) {
+      this.head = head;
+      this.tail = tail;
+    }
+    List.prototype.lastIndexOf = function(x) {
+      var idx = this.tail.lastIndexOf(x);
+      return idx >= 0 ? 1 + idx : this.head === x ? 0 : -1;
+    };
+
+    var list = new List('b',
+               new List('a',
+               new List('n',
+               new List('a',
+               new List('n',
+               new List('a',
+               new Empty()))))));
+
+    assert.strictEqual(R.lastIndexOf('a', 'banana'), 5);
+    assert.strictEqual(R.lastIndexOf('x', 'banana'), -1);
+    assert.strictEqual(R.lastIndexOf('a', list), 5);
+    assert.strictEqual(R.lastIndexOf('x', list), -1);
   });
 
   it('is curried', function() {

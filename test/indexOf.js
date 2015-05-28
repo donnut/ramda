@@ -41,10 +41,43 @@ describe('indexOf', function() {
     assert.strictEqual(R.indexOf('x', []), -1);
   });
 
-  it('has Object.is semantics', function() {
-    assert.strictEqual(R.indexOf(-0, [0]), -1);
+  it('has R.equals semantics', function() {
+    function Just(x) { this.value = x; }
+    Just.prototype.equals = function(x) {
+      return x instanceof Just && R.equals(x.value, this.value);
+    };
+
     assert.strictEqual(R.indexOf(0, [-0]), -1);
+    assert.strictEqual(R.indexOf(-0, [0]), -1);
     assert.strictEqual(R.indexOf(NaN, [NaN]), 0);
+    assert.strictEqual(R.indexOf(new Just([42]), [new Just([42])]), 0);
+  });
+
+  it('dispatches to `indexOf` method', function() {
+    function Empty() {}
+    Empty.prototype.indexOf = R.always(-1);
+
+    function List(head, tail) {
+      this.head = head;
+      this.tail = tail;
+    }
+    List.prototype.indexOf = function(x) {
+      var idx = this.tail.indexOf(x);
+      return this.head === x ? 0 : idx >= 0 ? 1 + idx : -1;
+    };
+
+    var list = new List('b',
+               new List('a',
+               new List('n',
+               new List('a',
+               new List('n',
+               new List('a',
+               new Empty()))))));
+
+    assert.strictEqual(R.indexOf('a', 'banana'), 1);
+    assert.strictEqual(R.indexOf('x', 'banana'), -1);
+    assert.strictEqual(R.indexOf('a', list), 1);
+    assert.strictEqual(R.indexOf('x', list), -1);
   });
 
   it('is curried', function() {

@@ -1,5 +1,5 @@
 var _has = require('./_has');
-var eq = require('../eq');
+var identical = require('../identical');
 var keys = require('../keys');
 var type = require('../type');
 
@@ -11,11 +11,17 @@ module.exports = function _eqDeep(a, b, stackA, stackB) {
     return false;
   }
 
-  if (eq(a, b)) {
+  if (typeA === 'Boolean' || typeA === 'Number' || typeA === 'String') {
+    return typeof a === 'object' ?
+      typeof b === 'object' && identical(a.valueOf(), b.valueOf()) :
+      identical(a, b);
+  }
+
+  if (identical(a, b)) {
     return true;
   }
 
-  if (typeA == 'RegExp') {
+  if (typeA === 'RegExp') {
     // RegExp equality algorithm: http://stackoverflow.com/a/10776635
     return (a.source === b.source) &&
            (a.global === b.global) &&
@@ -26,7 +32,7 @@ module.exports = function _eqDeep(a, b, stackA, stackB) {
   }
 
   if (Object(a) === a) {
-    if (typeA === 'Date' && a.getTime() != b.getTime()) {
+    if (typeA === 'Date' && a.getTime() !== b.getTime()) {
       return false;
     }
 
