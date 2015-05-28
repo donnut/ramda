@@ -831,6 +831,31 @@
     });
 
     /**
+<<<<<<< HEAD
+=======
+     * A function that returns the first argument if it's falsy otherwise the second
+     * argument. Note that this is NOT short-circuited, meaning that if expressions
+     * are passed they are both evaluated.
+     *
+     * @func
+     * @memberOf R
+     * @category Logic
+     * @sig * -> * -> *
+     * @param {*} a any value
+     * @param {*} b any other value
+     * @return {*} the first argument if falsy otherwise the second argument.
+     * @example
+     *
+     *      R.and(false, true); //=> false
+     *      R.and(0, []); //=> 0
+     *      R.and(null, ''); => null
+     */
+    var and = _curry2(function and(a, b) {
+        return a && b;
+    });
+
+    /**
+>>>>>>> df9d32e5b46d20ed84d13a82af1b64222fd10762
      * Returns a new list, composed of n-tuples of consecutive elements
      * If `n` is greater than the length of the list, an empty list is returned.
      *
@@ -2066,9 +2091,15 @@
      * @example
      *
      *      var xo = {x: 1};
+<<<<<<< HEAD
      *      var xoLens = R.lensOn(function get(o) { return o.x; },
      *                            function set(v) { return {x: v}; },
      *                            xo);
+=======
+     *      var xoLens = R.lensOn(xo,
+     *                            function get(o) { return o.x; },
+     *                            function set(v) { return {x: v}; });
+>>>>>>> df9d32e5b46d20ed84d13a82af1b64222fd10762
      *      xoLens(); //=> 1
      *      xoLens.set(1000); //=> {x: 1000}
      *      xoLens.map(R.add(1)); //=> {x: 2}
@@ -5312,6 +5343,66 @@
 
     /**
      * Creates a lens that will focus on index `n` of the source array.
+<<<<<<< HEAD
+=======
+     *
+     * @func
+     * @memberOf R
+     * @category List
+     * @see R.lens
+     * @sig Number -> (a -> b)
+     * @param {Number} n The index of the array that the returned lens will focus on.
+     * @return {Function} the returned function has `set` and `map` properties that are
+     *         also curried functions.
+     * @example
+     *
+     *     var headLens = R.lensIndex(0);
+     *     headLens([10, 20, 30, 40]); //=> 10
+     *     headLens.set('mu', [10, 20, 30, 40]); //=> ['mu', 20, 30, 40]
+     *     headLens.map(function(x) { return x + 1; }, [10, 20, 30, 40]); //=> [11, 20, 30, 40]
+     */
+    var lensIndex = function lensIndex(n) {
+        return lens(nth(n), function (x, xs) {
+            return _slice(xs, 0, n).concat([x], _slice(xs, n + 1));
+        });
+    };
+
+    /**
+     * Creates a lens that will focus on property `k` of the source object.
+     *
+     * @func
+     * @memberOf R
+     * @category Object
+     * @see R.lens
+     * @sig String -> (a -> b)
+     * @param {String} k A string that represents a property to focus on.
+     * @return {Function} the returned function has `set` and `map` properties that are
+     *         also curried functions.
+     * @example
+     *
+     *     var phraseLens = R.lensProp('phrase');
+     *     var obj1 = { phrase: 'Absolute filth . . . and I LOVED it!'};
+     *     var obj2 = { phrase: "What's all this, then?"};
+     *     phraseLens(obj1); // => 'Absolute filth . . . and I LOVED it!'
+     *     phraseLens(obj2); // => "What's all this, then?"
+     *     phraseLens.set('Ooh Betty', obj1); //=> { phrase: 'Ooh Betty'}
+     *     phraseLens.map(R.toUpper, obj2); //=> { phrase: "WHAT'S ALL THIS, THEN?"}
+     */
+    var lensProp = function (k) {
+        return lens(prop(k), assoc(k));
+    };
+
+    /**
+     * Returns a new list, constructed by applying the supplied function to every element of the
+     * supplied list.
+     *
+     * Note: `R.map` does not skip deleted or unassigned indices (sparse arrays), unlike the
+     * native `Array.prototype.map` method. For more details on this behavior, see:
+     * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/map#Description
+     *
+     * Acts as a transducer if a transformer is given in list position.
+     * @see R.transduce
+>>>>>>> df9d32e5b46d20ed84d13a82af1b64222fd10762
      *
      * @func
      * @memberOf R
@@ -6592,6 +6683,7 @@
     });
 
     /**
+<<<<<<< HEAD
      * Returns a new list without any consecutively repeating elements. Equality is
      * determined by applying the supplied predicate two consecutive elements.
      * The first element in a series of equal element is the one being preserved.
@@ -6626,6 +6718,42 @@
         }
         return result;
     }));
+=======
+     * Accepts at least three functions and returns a new function. When invoked, this new
+     * function will invoke the first function, `after`, passing as its arguments the
+     * results of invoking the subsequent functions with whatever arguments are passed to
+     * the new function.
+     *
+     * @func
+     * @memberOf R
+     * @category Function
+     * @sig ((*... -> c) -> (((* -> a), (* -> b), ...) -> c)
+     * @param {Function} after A function. `after` will be invoked with the return values of
+     *        `fn1` and `fn2` as its arguments.
+     * @param {...Function} functions A variable number of functions.
+     * @return {Function} A new function.
+     * @example
+     *
+     *      var add = function(a, b) { return a + b; };
+     *      var multiply = function(a, b) { return a * b; };
+     *      var subtract = function(a, b) { return a - b; };
+     *
+     *      //≅ multiply( add(1, 2), subtract(1, 2) );
+     *      R.converge(multiply, add, subtract)(1, 2); //=> -3
+     *
+     *      var add3 = function(a, b, c) { return a + b + c; };
+     *      R.converge(add3, multiply, add, subtract)(1, 2); //=> 4
+     */
+    var converge = curryN(3, function (after) {
+        var fns = _slice(arguments, 1);
+        return curryN(max(pluck('length', fns)), function () {
+            var args = arguments;
+            return after.apply(this, _map(function (fn) {
+                return fn.apply(this, args);
+            }, fns));
+        });
+    });
+>>>>>>> df9d32e5b46d20ed84d13a82af1b64222fd10762
 
     /**
      * Performs a deep test on whether two items are equal.
@@ -6675,6 +6803,67 @@
         return _extend(_extend({}, object), mapObjIndexed(function (fn, key) {
             return fn(object[key]);
         }, transformations));
+    });
+
+    /**
+     * Returns a new object containing only those key-value pairs of which the
+     * values match a given predicate function.
+     * The predicate function is passed one argument: *(value)*.
+     *
+     * @func
+     * @memberOf R
+     * @category Object
+     * @sig (a -> Boolean) -> {String, a} -> {String, a}
+     * @param {Function} fn The function called per key.
+     * @param {Object} obj The object to iterate over the keys.
+     * @return {Object} The new filtered object.
+     * @example
+     *
+     *      var isPositive = function(n) {
+     *        return n > 0;
+     *      };
+     *      R.filterObj(isPositive, {a: 1, b: 2, c: -1, d: 0, e: 5}); //=> {a: 1, b: 2, e: 5}
+     *
+     *      var colors = {1: {color: 'red'}, 2: {color: 'black', bgcolor: 'yellow'}};
+     *      R.filterObj(has('bgcolor'), colors); //=> {2: {color: 'black', bgcolor: 'yellow'}}
+     */
+    var filterObj = _curry2(function filterObj(fn, obj) {
+        var result = {}, ks = keys(obj), idx = ks.length;
+        while (--idx >= 0) {
+            if (fn(obj[ks[idx]])) {
+                result[ks[idx]] = obj[ks[idx]];
+            }
+        }
+        return result;
+    });
+
+    /**
+     * Like `filterObj`, but passes additional arguments to the predicate function.
+     * The predicate function is passed three arguments: *(value, key, obj)*.
+     *
+     * @func
+     * @memberOf R
+     * @category Object
+     * @sig (a, String, {String, a} -> Boolean) -> {String, a} -> {String, a}
+     * @param {Function} fn The function called per key.
+     * @param {Object} obj The object to iterate over the keys.
+     * @return {Object} The new filtered object.
+     * @example
+     *
+     *      var isUpperCase = function(val, key) { return key.toUpperCase() === key; };
+     *      var isUpperCasePositive = function(value, key) {
+     *        return value > 0 && isUpperCase(key);
+     *      };
+     *      R.filterObjIndexed(isUpperCasePositive, {a: 1, B: 2, c: -1, D: 0, e: 5}); //=> {B: 2}
+     */
+    var filterObjIndexed = _curry2(function filterObjIndexed(fn, obj) {
+        var result = {}, ks = keys(obj), idx = ks.length;
+        while (--idx >= 0) {
+            if (fn(obj[ks[idx]], ks[idx], obj)) {
+                result[ks[idx]] = obj[ks[idx]];
+            }
+        }
+        return result;
     });
 
     /**
@@ -7337,6 +7526,8 @@
         evolve: evolve,
         filter: filter,
         filterIndexed: filterIndexed,
+        filterObj: filterObj,
+        filterObjIndexed: filterObjIndexed,
         find: find,
         findIndex: findIndex,
         findLast: findLast,
